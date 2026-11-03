@@ -1,0 +1,133 @@
+-- Rivals | 10B Visits -> Boneclaw Rifle (executor)
+-- Language: Luau | Target: RIVALS (Roblox)
+
+local Players = game:GetService("Players")
+local LP = Players.LocalPlayer
+
+local Config = {
+    -- 10B Visits viewmodel path (adjust case if your build differs)
+    SourceSkin = "Skin Case 2",
+    SourceName = "10B Visits",
+
+    -- Boneclaw Rifle viewmodel path (Spooky Skin Case)
+    TargetSkin = "Spooky Skin Case",
+    TargetName = "Boneclaw Rifle",
+
+    -- fallback weapon folder name if the case path differs
+    WeaponFolder = "Assault Rifle",
+}
+
+local function getAssets()
+    local ps = LP:FindFirstChild("PlayerScripts")
+    if not ps then return nil end
+    local assets = ps:FindFirstChild("Assets")
+    if not assets then return nil end
+    return assets:FindFirstChild("ViewModels")
+end
+
+local function findModel(root, caseName, skinName)
+    if not root then return nil end
+    local caseFolder = root:FindFirstChild(caseName)
+    if caseFolder then
+        local m = caseFolder:FindFirstChild(skinName)
+        if m then return m end
+    end
+    -- deep search fallback
+    for _, v in ipairs(root:GetDescendants()) do
+        if v.Name == skinName and v:IsA("Model") then
+            return v
+        end
+    end
+    return nil
+end
+
+local function swapViewModel(weaponPath, skinModel)
+    if not weaponPath or not skinModel then return false end
+    weaponPath:ClearAllChildren()
+    for _, child in ipairs(skinModel:GetChildren()) do
+        child:Clone().Parent = weaponPath
+    end
+    return true
+end
+
+local function apply()
+    local viewModels = getAssets()
+    if not viewModels then
+        warn("[skinchanger] ViewModels not ready")
+        return
+    end
+
+    local weapons = viewModels:FindFirstChild("Weapons")
+    local arFolder = weapons and weapons:FindFirstChild(Config.WeaponFolder)
+    if not arFolder then
+        -- some builds keep the equipped skin under the case folders only
+        arFolder = findModel(viewModels, Config.SourceSkin, Config.SourceName)
+            or findModel(viewModels, "Weapons", Config.WeaponFolder)
+    end
+
+    local boneclaw = findModel(viewModels, Config.TargetSkin, Config.TargetName)
+    if not boneclaw then
+        -- alternate name variants seen in older builds
+        boneclaw = findModel(viewModels, Config.TargetSkin, "Boneclaw")
+            or findModel(viewModels, "Spooky Skin Case", "Boneclaw Rifle")
+    end
+
+    if not boneclaw then
+        warn("[skinchanger] Boneclaw model not found in ViewModels")
+        return
+    end
+
+    if arFolder and arFolder:IsA("Model") then
+        swapViewModel(arFolder, boneclaw)
+        print("[skinchanger] swapped Assault Rifle folder -> Boneclaw")
+    end
+
+    -- also hit the 10B Visits entry itself if it exists as its own model
+    local sourceModel = findModel(viewModels, Config.SourceSkin, Config.SourceName)
+    if sourceModel and sourceModel ~= arFolder then
+        swapViewModel(sourceModel, boneclaw)
+        print("[skinchanger] swapped 10B Visits model -> Boneclaw")
+    end
+
+    -- extra deep fallback in case the name lives under a different case
+    if not sourceModel then
+        sourceModel = findModel(viewModels, nil, Config.SourceName)
+            or findModel(viewModels, "Weapons", Config.SourceName)
+        if sourceModel then
+            swapViewModel(sourceModel, boneclaw)
+            print("[skinchanger] swapped 10B Visits (deep) -> Boneclaw")
+        end
+    end
+end
+
+-- run once assets exist, then re-apply on character / viewmodel refresh
+task.spawn(function()
+    local t0 = os.clock()
+    while not getAssets() and os.clock() - t0 < 15 do
+        task.wait(0.25)
+    end
+    apply()
+end)
+
+-- re-apply when the character respawns (viewmodel rebuild)
+LP.CharacterAdded:Connect(function()
+    task.wait(1.2)
+    apply()
+end)
+
+-- optional: re-apply when the tool is equipped
+LP.CharacterAdded:Connect(function(char)
+    char.ChildAdded:Connect(function(child)
+        if child:IsA("Tool") and (
+            child.Name:find("Assault")
+            or child.Name:find("Rifle")
+            or child.Name:find("10B")
+            or child.Name:find("Visits")
+        ) then
+            task.wait(0.35)
+            apply()
+        end
+    end)
+end)
+
+print("[skinchanger] 10B Visits -> Boneclaw loaded")
