@@ -127,4 +127,4 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     end
 end)
 
-print("[Ragebot] loaded | Z toggle | 0.02s fire | side flip on reload")
+print("[Ragebot] loaded | Z toggle | use vs cheaters | the best vs cheaters script?")
